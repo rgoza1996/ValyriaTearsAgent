@@ -67,9 +67,9 @@ static const char DASHBOARD_HTML[] = R"html(
         }
         .game-screen-frame {
             position: relative;
-            display: inline-block;
             width: 800px;
             height: 600px;
+            flex-shrink: 0;
         }
         .game-screen-frame::before,
         .game-screen-frame::after,
@@ -81,10 +81,11 @@ static const char DASHBOARD_HTML[] = R"html(
             height: 16px;
             border-color: #00d4ff;
             border-style: solid;
+            z-index: 2;
         }
         .game-screen-frame::before { top: 0; left: 0; border-width: 2px 0 0 2px; }
         .game-screen-frame::after  { top: 0; right: 0; border-width: 2px 2px 0 0; }
-        .corner-br { position: absolute; bottom: 0; left: 0; right: 0; height: 16px; }
+        .corner-br { position: absolute; bottom: 0; left: 0; right: 0; height: 16px; z-index: 2; }
         .corner-br::before { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
         .corner-br::after  { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
 
@@ -92,7 +93,6 @@ static const char DASHBOARD_HTML[] = R"html(
             display: block;
             width: 800px;
             height: 600px;
-            object-fit: contain;
         }
         .screen-overlay {
             position: absolute;
@@ -360,6 +360,7 @@ static const char DASHBOARD_HTML[] = R"html(
 })();
 </script>
 </body>
-</html>)html";
+</html>
+)html";
 
 #endif
