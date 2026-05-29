@@ -24,7 +24,76 @@ POST /load  {"slot": 0} → restore from slot 0-9
 
 ---
 
-## Priority 2 — Action Primitives
+## Priority 2 — Structured Memory Reading
+
+**Status: Not Started**
+
+Instead of inferring game state from screenshots, read actual C++ game variables.
+
+**Current:** `/state` returns partial data (mode, party_size, map_name)
+
+**Desired:** Full game state parsed from RAM/game structs:
+- Player position (x, y, map_id)
+- Inventory (items, quantities)
+- Quest state (current objective, flags)
+- NPC dialog text
+- Battle state (enemy HP, available moves)
+
+**Why before gameplay testing:** Without structured state, the only feedback is screenshots — slow, brittle, and impossible to programmatically verify success vs failure. Priority 2 provides the feedback loop needed for any autonomous play.
+
+**Approach:** Find relevant structs in ValyriaTear source (GlobalManager, ModeManager, etc.) and expose them via GameAPI.
+
+---
+
+## Priority 3 — WebSocket Streaming
+
+**Status: Not Started**
+
+Replace polling with push-based WebSocket for lower latency and real-time events.
+
+**Endpoints:**
+- `ws://localhost:8080/ws` — push state + screenshot frames
+- Live AI reasoning stream (pokemon-agent calls this "watch the agent think")
+
+**Use cases:**
+- Lower-latency game control
+- Real-time action log
+- Live dashboard updates without polling overhead
+
+---
+
+## Priority 4 — A* Pathfinding
+
+**Status: Not Started**
+
+**Use case:** Agent needs to navigate from point A to point B on a map.
+
+**Requirements:**
+1. Parse tilemap data from ValyriaTear's map format
+2. Build a navigable grid (walkable vs blocked tiles)
+3. Implement A* pathfinding
+4. Expose `navigate_to(x, y)` action that follows the path
+
+**Reference:** pokemon-agent has `pathfinding.py` with A* already implemented.
+
+---
+
+## Priority 5 — Hermes Agent Skill
+
+**Status: Not Started**
+
+Create a `valyriatear-player` skill so you can say "Play ValyriaTear" and Hermes sets everything up and starts playing autonomously.
+
+Pattern from `pokemon-player` skill:
+- Install/setup the game
+- Start Xvfb
+- Launch the server
+- Begin autonomous gameplay
+- Track objectives across sessions via persistent memory
+
+---
+
+## Priority 6 — Action Primitives
 
 **Status: ✅ Done**
 
@@ -61,73 +130,6 @@ Replace raw SDL scancodes with named game actions.
 
 ---
 
-## Priority 3 — WebSocket Streaming
-
-**Status: Not Started**
-
-Replace polling with push-based WebSocket for lower latency and real-time events.
-
-**Endpoints:**
-- `ws://localhost:8080/ws` — push state + screenshot frames
-- Live AI reasoning stream (pokemon-agent calls this "watch the agent think")
-
-**Use cases:**
-- Lower-latency game control
-- Real-time action log
-- Live dashboard updates without polling overhead
-
----
-
-## Priority 4 — Hermes Agent Skill
-
-**Status: Not Started**
-
-Create a `valyriatear-player` skill so you can say "Play ValyriaTear" and Hermes sets everything up and starts playing autonomously.
-
-Pattern from `pokemon-player` skill:
-- Install/setup the game
-- Start Xvfb
-- Launch the server
-- Begin autonomous gameplay
-- Track objectives across sessions via persistent memory
-
----
-
-## Priority 5 — Structured Memory Reading
-
-**Status: Not Started**
-
-Instead of inferring game state from screenshots, read actual C++ game variables.
-
-**Current:** `/state` returns partial data (mode, party_size, map_name)
-
-**Desired:** Full game state parsed from RAM/game structs:
-- Player position (x, y, map_id)
-- Inventory (items, quantities)
-- Quest state (current objective, flags)
-- NPC dialog text
-- Battle state (enemy HP, available moves)
-
-**Approach:** Find relevant structs in ValyriaTear source (GlobalManager, ModeManager, etc.) and expose them via GameAPI.
-
----
-
-## Priority 6 — A* Pathfinding
-
-**Status: Not Started**
-
-**Use case:** Agent needs to navigate from point A to point B on a map.
-
-**Requirements:**
-1. Parse tilemap data from ValyriaTear's map format
-2. Build a navigable grid (walkable vs blocked tiles)
-3. Implement A* pathfinding
-4. Expose `navigate_to(x, y)` action that follows the path
-
-**Reference:** pokemon-agent has `pathfinding.py` with A* already implemented.
-
----
-
 ## Priority 7 — Multi-game / Multi-mod Framework
 
 **Status: Not Started**
@@ -157,7 +159,7 @@ memory/red.py       → concrete implementation
 | WebSocket | ✅ | ❌ Not yet |
 | Save/Load state | ✅ | ✅ Priority 1 |
 | Memory parsing | ✅ RAM → JSON | ⚠️ Partial |
-| Action primitives | ✅ walk_to, interact | ✅ /do endpoint |
+| Action primitives | ✅ walk_to, interact | ✅ Priority 6 |
 | A* pathfinding | ✅ | ❌ Not yet |
 | Dashboard | ✅ + AI reasoning | ✅ (basic) |
 | Hermes skill | ✅ | ❌ Not yet |
