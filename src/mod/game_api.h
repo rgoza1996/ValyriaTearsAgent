@@ -1,8 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // ValyriaTear HTTP API Mod — Game State API
-// Exposes game state to the HTTP server via Lua bindings
+// Exposes game state to the HTTP server
 ////////////////////////////////////////////////////////////////////////////////
-
 #ifndef VALYRIA_GAME_API_H
 #define VALYRIA_GAME_API_H
 
@@ -34,15 +33,27 @@ public:
     // Take screenshot, return path to PNG file
     std::string TakeScreenshot();
 
-    // Trigger save
-    void SaveGame(int slot = 1);
+    // Save game to a named slot. slot: 0-based slot index.
+    // Returns JSON: {"status":"ok","slot":1,"path":"/path/to/save.lua"}
+    // or {"status":"error","message":"..."}
+    std::string SaveGame(int slot);
 
-    // Trigger load
-    void LoadGame(int slot = 1);
+    // Load game from a named slot.
+    // Returns JSON: {"status":"ok","slot":1}
+    // or {"status":"error","message":"..."}
+    std::string LoadGame(int slot);
+
+    // List all available save slots with metadata.
+    // Returns JSON: {"saves":[{"slot":0,"path":"...","exists":true},...]}
+    std::string ListSaves();
+
+    // Get the save directory path
+    std::string GetSavesDirectory();
 
 private:
     GameAPI();
     std::string _last_screenshot;
+    std::string _saves_dir;
 };
 
 } // namespace vt_mod

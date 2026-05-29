@@ -4,21 +4,23 @@ Inspired by [pokemon-agent](https://github.com/NousResearch/pokemon-agent) by No
 
 ## Priority 1 — Save/Load State
 
-**Status: In Progress**
+**Status: ✅ Done**
 
-The ValyriaTear game crashes frequently (alpha software). Named save states would let the agent:
+The ValyriaTear game crashes frequently (alpha software). Named save states let the agent:
 - Create checkpoints before risky encounters
 - Restore and retry after crashes
 - Test strategies without losing progress
 
-**API design:**
+**API:**
 ```
-POST /save     { "name": "before_boss" }  → saves to ~/.valyriatear/saves/<name>.save
-POST /load     { "name": "before_boss" }  → restores from save
-GET  /saves    → list of available saves
+GET  /saves              → list available slots
+POST /save  {"slot": 0} → save to slot 0-9
+POST /load  {"slot": 0} → restore from slot 0-9
 ```
 
-**Implementation:** ValyriaTear already has a save format. Need to find the save/load functions in the C++ codebase and expose them via the HTTP API.
+**Saves location:** `~/.local/share/valyriatear/saved_game_<N>.lua`
+
+**Tested:** Slot 0 save → file created, /saves confirms exists.
 
 ---
 

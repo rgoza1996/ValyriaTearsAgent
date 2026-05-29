@@ -40,8 +40,11 @@ valyriatear binary (main.cpp)
 | GET | `/health` | Server health check |
 | GET | `/state` | Current game state (mode, party_size, map_name) |
 | GET | `/screenshot_base64` | Base64 PNG of current frame as JSON |
+| GET | `/saves` | List available save slots |
 | GET | `/dashboard/` | Live game dashboard (HTML/JS) |
 | POST | `/action` | Inject input |
+| POST | `/save` | Save game to slot (0-9) |
+| POST | `/load` | Load game from slot (0-9) |
 
 ### POST /action
 
