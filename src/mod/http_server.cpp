@@ -6,6 +6,7 @@
 #include "http_server.h"
 #include "game_api.h"
 #include "input_inject.h"
+#include "dashboard_html.h"
 #include <civetweb.h>
 #include <fstream>
 #include <sstream>
@@ -200,6 +201,12 @@ int HTTPServer::_HandleRequest(struct mg_connection* conn, void* /*cbdata*/) {
         std::string response = "{\"status\":\"ok\",\"action\":{\"key\":\"" + key +
             "\",\"duration_ms\":" + to_string(duration) + "}}";
         send_response(conn, 200, "application/json", response);
+        return 1;
+    }
+
+    // GET /dashboard -> HTML dashboard
+    if (method == "GET" && (uri == "/dashboard" || uri == "/dashboard/")) {
+        send_response(conn, 200, "text/html", DASHBOARD_HTML);
         return 1;
     }
 
