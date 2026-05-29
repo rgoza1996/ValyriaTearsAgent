@@ -64,6 +64,9 @@ static const char DASHBOARD_HTML[] = R"html(
             background: #000;
             border-radius: 4px;
             overflow: hidden;
+            width: 800px;
+            height: 600px;
+            flex-shrink: 0;
         }
         .game-screen-frame {
             position: relative;
