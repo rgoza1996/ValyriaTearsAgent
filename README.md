@@ -22,7 +22,7 @@ open http://localhost:8080/dashboard/
 valyriatear binary (main.cpp)
   ├── VideoEngine      → MakeScreenshot() → PNG via xwd
   ├── InputEngine      → EventHandler() → SDL events
-  ├── InputInjector    → QueueAction() → SDL_PushEvent()
+  ├── InputInjector    → QueueAction() / QueueSequence() → SDL_PushEvent()
   ├── GameAPI          → GetStateJSON() → mode, party, map_name
   └── HTTPServer        → POSIX socket server on :8080
         ├── GET  /health             → OK
@@ -30,7 +30,8 @@ valyriatear binary (main.cpp)
         ├── GET  /screenshot         → PNG image
         ├── GET  /screenshot_base64  → {"status":"ok","image":"..."}
         ├── GET  /dashboard/         → Live game dashboard (HTML)
-        └── POST /action             → inject keypress
+        ├── POST /action             → inject raw keypress
+        └── POST /do                 → action primitives
 ```
 
 ## Endpoints
@@ -42,11 +43,12 @@ valyriatear binary (main.cpp)
 | GET | `/screenshot_base64` | Base64 PNG of current frame as JSON |
 | GET | `/saves` | List available save slots |
 | GET | `/dashboard/` | Live game dashboard (HTML/JS) |
-| POST | `/action` | Inject input |
+| POST | `/action` | Inject raw keypress |
+| POST | `/do` | Execute named action primitive |
 | POST | `/save` | Save game to slot (0-9) |
 | POST | `/load` | Load game from slot (0-9) |
 
-### POST /action
+### POST /action (raw keypress)
 
 ```bash
 curl -X POST http://localhost:8080/action \
@@ -54,7 +56,35 @@ curl -X POST http://localhost:8080/action \
   -d '{"key": "confirm", "duration_ms": 200}'
 ```
 
-Available keys: `up`, `down`, `left`, `right`, `confirm`, `cancel`, `menu`, `pause`
+Available keys: `up`, `down`, `left`, `right`, `confirm`, `cancel`, `menu`, `pause`, `minimap`, `escape`, `return`, `tab`
+
+### POST /do (action primitives)
+
+Named action sequences — pre-built multi-step interactions.
+
+```bash
+curl -X POST http://localhost:8080/do \
+  -H "Content-Type: application/json" \
+  -d '{"action": "interact"}'
+```
+
+Available action primitives:
+
+| Action | Description |
+|--------|-------------|
+| `interact` | Press confirm to interact with NPC/object |
+| `open_menu` | Open the game menu |
+| `close_menu` | Close the current menu |
+| `pause` | Toggle pause |
+| `minimap` | Toggle minimap |
+| `navigate_up` | Walk up (~300ms) |
+| `navigate_down` | Walk down (~300ms) |
+| `navigate_left` | Walk left (~300ms) |
+| `navigate_right` | Walk right (~300ms) |
+| `select` | Confirm selection |
+| `back` | Go back / cancel |
+
+Raw key still supported via `{"key": "...", "duration_ms": ...}` for direct control.
 
 ## Build
 
@@ -101,7 +131,7 @@ CSS: dark cyberpunk theme with cyan neon accents.
 |------|---------|
 | `http_server.cpp` + `.h` | POSIX socket HTTP server (no external deps) |
 | `game_api.cpp` + `.h` | Game state via VideoManager, ModeManager, GlobalManager |
-| `input_inject.cpp` + `.h` | Queued SDL keypress injection via SDL_PushEvent() |
+| `input_inject.cpp` + `.h` | Queued SDL keypress injection via SDL_PushEvent(); supports named sequences |
 | `dashboard.html` | Embedded dashboard UI (served at /dashboard/) |
 | `dashboard_html.h` | Auto-generated C string literal from dashboard.html |
 | `civetweb.c` + `.h` | Original (unused, retained for reference) |

@@ -26,22 +26,38 @@ POST /load  {"slot": 0} → restore from slot 0-9
 
 ## Priority 2 — Action Primitives
 
-**Status: Not Started**
+**Status: ✅ Done**
 
 Replace raw SDL scancodes with named game actions.
 
-**Current:** `POST /action { "key": "down", "duration_ms": 200 }`
-
-**Proposed:**
+**Before:**
 ```json
-{ "action": "walk_to", "x": 5, "y": 3 }
+{ "key": "down", "duration_ms": 200 }
+```
+
+**After — `/do` endpoint:**
+```json
 { "action": "interact" }
 { "action": "open_menu" }
 { "action": "close_menu" }
-{ "action": "navigate_to", "target": "Save Point" }
+{ "action": "pause" }
+{ "action": "navigate_up" }
+{ "action": "navigate_down" }
+{ "action": "navigate_left" }
+{ "action": "navigate_right" }
+{ "action": "select" }
+{ "action": "back" }
 ```
 
-**Benefits:** Agent can issue intent-based commands rather than pixel-counting navigation.
+**Raw key still supported** via `{"key": "...", "duration_ms": ...}` for direct control.
+
+**Available keys:** up, down, left, right, confirm, cancel, menu, pause, minimap, escape, return, tab
+
+**Endpoints:**
+- `POST /action` — raw keypress (backward compatible)
+- `POST /do` — named action primitives
+
+**Tested:** All 11 primitives confirmed returning `{"status":"ok","action":"..."}`.
 
 ---
 
@@ -139,9 +155,9 @@ memory/red.py       → concrete implementation
 | Headless emulation | ✅ PyBoy/PyGBA | ✅ Xvfb + real binary |
 | REST API | ✅ | ✅ |
 | WebSocket | ✅ | ❌ Not yet |
-| Save/Load state | ✅ | ❌ Not yet |
+| Save/Load state | ✅ | ✅ Priority 1 |
 | Memory parsing | ✅ RAM → JSON | ⚠️ Partial |
-| Action primitives | ✅ walk_to, interact | ❌ Raw keys only |
+| Action primitives | ✅ walk_to, interact | ✅ /do endpoint |
 | A* pathfinding | ✅ | ❌ Not yet |
 | Dashboard | ✅ + AI reasoning | ✅ (basic) |
 | Hermes skill | ✅ | ❌ Not yet |

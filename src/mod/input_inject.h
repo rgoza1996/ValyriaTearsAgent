@@ -36,6 +36,12 @@ public:
     // Check if any action is currently active
     bool IsActive() const;
 
+    // Queue a named sequence of actions
+    void QueueSequence(const std::string& name);
+
+    // Check current sequence name (empty = no sequence running)
+    std::string GetCurrentSequence() const;
+
 private:
     InputInjector();
     ~InputInjector();
@@ -43,8 +49,10 @@ private:
     SDL_Keycode _KeyNameToSDL(const std::string& key);
     void _InjectKeyDown(SDL_Keycode key);
     void _InjectKeyUp(SDL_Keycode key);
+    void _QueueActionUnlocked(const std::string& key, int duration_ms);
 
     std::vector<KeyAction> _actions;
+    std::string _current_sequence;
     SDL_mutex* _mutex;
 };
 

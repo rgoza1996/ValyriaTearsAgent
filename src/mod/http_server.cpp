@@ -220,6 +220,30 @@ void handle_request(int client_fd, const std::string& method, const std::string&
         send_response(client_fd, 200, "application/json", resp.data(), resp.size());
         return;
     }
+
+    // POST /do — action primitives: interact, open_menu, close_menu, pause, navigate_up/down/left/right, etc.
+    if (method == "POST" && uri == "/do") {
+        std::string action = extract_json_field(body, "action");
+        std::string duration_str = extract_json_field(body, "duration_ms");
+        std::string key = extract_json_field(body, "key");
+
+        std::string resp;
+        if (!action.empty()) {
+            InputInjector::SingletonGet()->QueueSequence(action);
+            resp = "{\"status\":\"ok\",\"action\":\"" + action + "\"}";
+        } else if (!key.empty()) {
+            int duration = 200;
+            if (!duration_str.empty()) duration = std::atoi(duration_str.c_str());
+            InputInjector::SingletonGet()->QueueAction(key, duration);
+            resp = "{\"status\":\"ok\",\"key\":\"" + key + "\",\"duration_ms\":" + int_to_string(duration) + "}";
+        } else {
+            resp = "{\"status\":\"error\",\"message\":\"Provide action or key field\"}";
+            send_response(client_fd, 400, "application/json", resp.data(), resp.size());
+            return;
+        }
+        send_response(client_fd, 200, "application/json", resp.data(), resp.size());
+        return;
+    }
     if (method == "POST" && uri == "/save") {
         std::string slot_str = extract_json_field(body, "slot");
         int slot = 0;
