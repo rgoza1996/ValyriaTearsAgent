@@ -20,8 +20,6 @@ POST /load  {"slot": 0} → restore from slot 0-9
 
 **Saves location:** `~/.local/share/valyriatear/saved_game_<N>.lua`
 
-**Tested:** Slot 0 save → file created, /saves confirms exists.
-
 ---
 
 ## Priority 2 — Action Primitives
@@ -30,55 +28,43 @@ POST /load  {"slot": 0} → restore from slot 0-9
 
 Replace raw SDL scancodes with named game actions.
 
-**Before:**
-```json
-{ "key": "down", "duration_ms": 200 }
-```
-
-**After — `/do` endpoint:**
-```json
-{ "action": "interact" }
-{ "action": "open_menu" }
-{ "action": "close_menu" }
-{ "action": "pause" }
-{ "action": "navigate_up" }
-{ "action": "navigate_down" }
-{ "action": "navigate_left" }
-{ "action": "navigate_right" }
-{ "action": "select" }
-{ "action": "back" }
-```
-
-**Raw key still supported** via `{"key": "...", "duration_ms": ...}` for direct control.
-
-**Available keys:** up, down, left, right, confirm, cancel, menu, pause, minimap, escape, return, tab
-
 **Endpoints:**
-- `POST /action` — raw keypress (backward compatible)
-- `POST /do` — named action primitives
+- `POST /action` — raw keypress: `{"key": "up", "duration_ms": 200}`
+- `POST /do` — named primitives: `{"action": "interact"}`
 
-**Tested:** All 11 primitives confirmed returning `{"status":"ok","action":"..."}`.
+**Available:** interact, open_menu, close_menu, pause, minimap, navigate_up/down/left/right, select, back
 
 ---
 
 ## Priority 3 — Structured Memory Reading
 
-**Status: Not Started**
+**Status: ✅ Done**
 
-Instead of inferring game state from screenshots, read actual C++ game variables.
+`GET /state` now returns enriched structured game state:
 
-**Current:** `/state` returns partial data (mode, party_size, map_name)
+```json
+{
+  "mode": "map",
+  "mode_id": 2,
+  "map_name": "hero_home",
+  "player_x": 4.5,
+  "player_y": 12.3,
+  "party_size": 2,
+  "party": [
+    {"id": 1, "hp": 45, "max_hp": 100, "xp_level": 3},
+    {"id": 2, "hp": 30, "max_hp": 80,  "xp_level": 2}
+  ],
+  "quests": [
+    {"quest_id": "darkness_falls", "log_number": 1}
+  ],
+  "inventory_count": 12,
+  "gold": 350
+}
+```
 
-**Desired:** Full game state parsed from RAM/game structs:
-- Player position (x, y, map_id)
-- Inventory (items, quantities)
-- Quest state (current objective, flags)
-- NPC dialog text
-- Battle state (enemy HP, available moves)
+**Fields added:** map_name, player_x/y (map mode), xp_level per character, quests array, inventory_count, gold (drunes).
 
-**Why before gameplay testing:** Without structured state, the only feedback is screenshots — slow, brittle, and impossible to programmatically verify success vs failure. Priority 3 provides the feedback loop needed for any autonomous play.
-
-**Approach:** Find relevant structs in ValyriaTear source (GlobalManager, ModeManager, etc.) and expose them via GameAPI.
+**Limitation:** Quest title/description fields use `ustring` (UTF-16 internal) — not yet convertible to JSON strings without additional ustring.h dependency. Quest IDs are always available.
 
 ---
 
@@ -142,12 +128,6 @@ Generalize the architecture so ValyriaTear-agent becomes a pattern for other gam
 - `EmulatorController` — save/load, screenshot, tick
 - `GameServer` — REST + WebSocket API
 
-This mirrors pokemon-agent's structure:
-```
-memory/reader.py     → abstract reader
-memory/red.py       → concrete implementation
-```
-
 ---
 
 ## Feature Comparison with pokemon-agent
@@ -158,7 +138,7 @@ memory/red.py       → concrete implementation
 | REST API | ✅ | ✅ |
 | WebSocket | ✅ | ❌ Not yet |
 | Save/Load state | ✅ | ✅ Priority 1 |
-| Memory parsing | ✅ RAM → JSON | ⚠️ Partial |
+| Memory parsing | ✅ RAM → JSON | ✅ Priority 3 (partial) |
 | Action primitives | ✅ walk_to, interact | ✅ Priority 2 |
 | A* pathfinding | ✅ | ❌ Not yet |
 | Dashboard | ✅ + AI reasoning | ✅ (basic) |
