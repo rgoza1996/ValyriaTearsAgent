@@ -7,8 +7,13 @@
 #include "engine/mode_manager.h"
 #include "common/global/global.h"
 #include "common/global/actors/global_character.h"
+#include "common/global/actors/global_party.h"
+#include "common/global/objects/global_inventory_handler.h"
+#include "common/global/quests/quests.h"
+#include "common/global/quests/quest_log_entry.h"
 #include "common/app_settings.h"
 #include "modes/map/map_mode.h"
+#include "modes/map/map_sprites/map_virtual_sprite.h"
 #include "common/global/maps/map_data_handler.h"
 #include <sstream>
 #include <sys/stat.h>
@@ -29,49 +34,148 @@ std::string GameAPI::TakeScreenshot() {
     return _last_screenshot;
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+namespace {
+
+void JsonEscape(const std::string& in, std::ostringstream& out) {
+    for (char c : in) {
+        if (c == '"') out << "\\\"";
+        else if (c == '\\') out << "\\\\";
+        else if (c == '\n') out << "\\n";
+        else if (c == '\r') out << "\\r";
+        else if (c == '\t') out << "\\t";
+        else out << c;
+    }
+}
+
+void WriteStr(std::ostringstream& json, const std::string& key, const std::string& value, bool last = false) {
+    json << "\"" << key << "\":\"";
+    JsonEscape(value, json);
+    json << "\"";
+    if (!last) json << ",";
+}
+
+void WriteRaw(std::ostringstream& json, const std::string& key, const std::string& value, bool last = false) {
+    json << "\"" << key << "\":" << value;
+    if (!last) json << ",";
+}
+
+void WriteInt(std::ostringstream& json, const std::string& key, int64_t value, bool last = false) {
+    json << "\"" << key << "\":" << value;
+    if (!last) json << ",";
+}
+
+void WriteFloat(std::ostringstream& json, const std::string& key, float value, bool last = false) {
+    json << "\"" << key << "\":" << value;
+    if (!last) json << ",";
+}
+
+} // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// State — enriched structured state
+// ---------------------------------------------------------------------------
+
 std::string GameAPI::GetStateJSON() {
     using namespace vt_mode_manager;
     using namespace vt_global;
 
     std::ostringstream json;
+    json << "{";
 
+    // Mode
     uint8_t mode_type = ModeManager->GetGameType();
-
     const char* mode_names[] = {
         "dummy", "boot", "map", "battle", "menu", "shop", "pause", "save"
     };
     const char* mode_name = (mode_type <= 7) ? mode_names[mode_type] : "unknown";
+    WriteStr(json, "mode", std::string(mode_name));
+    WriteInt(json, "mode_id", static_cast<int>(mode_type));
 
-    json << "{\"status\":\"ok\",";
-    json << "\"mode\":\"" << mode_name << "\",";
-    json << "\"mode_id\":" << static_cast<int>(mode_type);
+    // Map name + player position (only in map mode)
+    if (mode_type == 2) { // MAP mode
+        try {
+            vt_map::MapMode* mm = vt_map::MapMode::CurrentInstance();
+            if (mm) {
+                vt_global::MapDataHandler& map_data = GlobalManager->GetMapData();
+                std::string map_file = map_data.GetMapDataFilename();
+                size_t slash = map_file.find_last_of("/\\");
+                std::string map_name = (slash != std::string::npos) ? map_file.substr(slash + 1) : map_file;
+                size_t dot = map_name.rfind(".lua");
+                if (dot != std::string::npos) map_name = map_name.substr(0, dot);
+                WriteStr(json, "map_name", map_name);
 
+                vt_map::private_map::VirtualSprite* cam = mm->GetCamera();
+                if (cam) {
+                    WriteFloat(json, "player_x", cam->GetXPosition());
+                    WriteFloat(json, "player_y", cam->GetYPosition());
+                }
+            }
+        } catch (const std::exception& e) {
+            // ignore
+        }
+    }
+
+    // Party
     try {
         CharacterHandler& char_handler = GlobalManager->GetCharacterHandler();
         GlobalParty& party = char_handler.GetActiveParty();
         uint32_t party_size = party.GetPartySize();
         const std::vector<GlobalCharacter*>& chars = party.GetAllCharacters();
 
-        json << ",\"party_size\":" << party_size;
-        json << ",\"party\":[";
-
+        WriteInt(json, "party_size", static_cast<int>(party_size));
+        json << "\"party\":[";
         for (uint32_t i = 0; i < party_size; ++i) {
             if (i > 0) json << ",";
             GlobalCharacter* actor = chars[i];
             json << "{";
-            json << "\"id\":" << actor->GetID() << ",";
-            json << "\"hp\":" << actor->GetHitPoints() << ",";
-            json << "\"max_hp\":" << actor->GetMaxHitPoints();
+            WriteInt(json, "id", actor->GetID());
+            WriteInt(json, "hp", actor->GetHitPoints());
+            WriteInt(json, "max_hp", actor->GetMaxHitPoints());
+            WriteInt(json, "xp_level", actor->GetExperienceLevel(), true);
             json << "}";
         }
         json << "]";
+
+        // Quests
+        GameQuests& quests = GlobalManager->GetGameQuests();
+        std::vector<QuestLogEntry*> active_quests = quests.GetActiveQuestIds();
+        json << ",\"quests\":[";
+        bool first_quest = true;
+        for (QuestLogEntry* entry : active_quests) {
+            if (!entry) continue;
+            if (!first_quest) json << ",";
+            first_quest = false;
+            json << "{";
+            WriteRaw(json, "quest_id", "\"" + entry->GetQuestId() + "\"");
+            WriteInt(json, "log_number", entry->GetQuestLogNumber(), true);
+            json << "}";
+        }
+        json << "]";
+
+        // Inventory
+        InventoryHandler& inv = GlobalManager->GetInventoryHandler();
+        auto& items = inv.GetInventoryItems();
+        WriteInt(json, "inventory_count", static_cast<int>(items.size()));
+
+        // Gold
+        WriteInt(json, "gold", GlobalManager->GetDrunes(), true);
+
     } catch (const std::exception& e) {
-        json << ",\"party_size\":0,\"party\":[]";
+        WriteInt(json, "party_size", 0, true);
+        json << "\"party\":[]";
     }
 
     json << "}";
     return json.str();
 }
+
+// ---------------------------------------------------------------------------
+// Saves
+// ---------------------------------------------------------------------------
 
 std::string GameAPI::GetSavesDirectory() {
     return _saves_dir;
@@ -144,17 +248,14 @@ std::string GameAPI::LoadGame(int slot) {
         return err.str();
     }
 
-    // Pop all modes first
     ModeManager->PopAll();
 
-    // Load game into GlobalManager
     bool result = GlobalManager->LoadGame(filename.str(), slot);
 
     if (!result) {
         return "{\"status\":\"error\",\"message\":\"Load failed\"}";
     }
 
-    // Reconstruct and push MapMode
     try {
         vt_global::MapDataHandler& map_data = GlobalManager->GetMapData();
         vt_map::MapMode* mm = new vt_map::MapMode(
