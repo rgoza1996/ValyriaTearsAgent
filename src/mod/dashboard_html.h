@@ -1,4 +1,4 @@
-// Auto-generated — do not edit manually
+// Auto-generated - do not edit manually
 // Regen: python3 scripts/gen_dashboard_html.py > src/mod/dashboard_html.h
 
 #ifndef VALYRIA_DASHBOARD_HTML_H
@@ -35,9 +35,13 @@ static const char DASHBOARD_HTML[] = R"html(
             text-shadow: 0 0 10px #00d4ff66;
             letter-spacing: 2px;
         }
-        .status { font-size: 12px; color: #888; }
+        .status {
+            font-size: 12px;
+            color: #888;
+        }
         .status.connected { color: #00ff88; }
         .status.disconnected { color: #ff4444; }
+
         main {
             display: grid;
             grid-template-columns: 1fr 320px;
@@ -45,6 +49,7 @@ static const char DASHBOARD_HTML[] = R"html(
             padding: 16px;
             flex: 1;
         }
+
         .game-view {
             background: #111122;
             border: 1px solid #0f3460;
@@ -63,7 +68,8 @@ static const char DASHBOARD_HTML[] = R"html(
         .game-screen-frame {
             position: relative;
             display: inline-block;
-            min-width: 320px;
+            width: 800px;
+            height: 600px;
         }
         .game-screen-frame::before,
         .game-screen-frame::after,
@@ -81,13 +87,11 @@ static const char DASHBOARD_HTML[] = R"html(
         .corner-br { position: absolute; bottom: 0; left: 0; right: 0; height: 16px; }
         .corner-br::before { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
         .corner-br::after  { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
         #gameScreen {
             display: block;
-            margin: auto;
-            max-width: 100%;
-            max-height: 100%;
-            min-height: 300px;
-            background: #000;
+            width: 800px;
+            height: 600px;
             object-fit: contain;
         }
         .screen-overlay {
@@ -101,6 +105,7 @@ static const char DASHBOARD_HTML[] = R"html(
             font-size: 14px;
         }
         .screen-overlay.hidden { display: none; }
+
         .state-panel {
             background: #0d0d1a;
             border-radius: 4px;
@@ -116,11 +121,13 @@ static const char DASHBOARD_HTML[] = R"html(
         .state-row:last-child { border: none; }
         .state-label { color: #666; }
         .state-value { color: #00d4ff; font-weight: bold; }
+
         .sidebar {
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
+
         .controls {
             background: #111122;
             border: 1px solid #0f3460;
@@ -157,6 +164,7 @@ static const char DASHBOARD_HTML[] = R"html(
         .dpad-btn:hover { background: #16213e; box-shadow: 0 0 8px #00d4ff44; }
         .dpad-btn:active { background: #0f3460; }
         .dpad-btn.placeholder { visibility: hidden; }
+
         .action-buttons {
             display: flex;
             flex-wrap: wrap;
@@ -178,6 +186,7 @@ static const char DASHBOARD_HTML[] = R"html(
         .action-btn:active { background: #0f3460; }
         .action-btn.confirm { border-color: #00ff88; color: #00ff88; }
         .action-btn.cancel  { border-color: #ff6b6b; color: #ff6b6b; }
+
         .api-debug {
             background: #111122;
             border: 1px solid #0f3460;
@@ -262,48 +271,63 @@ static const char DASHBOARD_HTML[] = R"html(
 <script>
 (function() {
     'use strict';
-    var BASE = window.location.protocol + '//' + window.location.host;
-    var POLL_MS = 1500;
-    var hasFrame = false;
-    var logEl = document.getElementById('apiLog');
-    var statusEl = document.getElementById('status');
+    const BASE = window.location.protocol + '//' + window.location.host;
+    const POLL_MS = 1500;
+    let hasFrame = false;
+    const log = document.getElementById('apiLog');
+    const status = document.getElementById('status');
 
     function logMsg(text, type) {
-        var el = document.createElement('div');
+        const el = document.createElement('div');
         el.className = 'api-log-entry ' + (type || 'info');
-        var t = new Date().toLocaleTimeString();
+        const t = new Date().toLocaleTimeString();
         el.textContent = t + ' ' + text;
-        logEl.appendChild(el);
-        logEl.scrollTop = logEl.scrollHeight;
-        while (logEl.children.length > 100) logEl.removeChild(logEl.firstChild);
+        log.appendChild(el);
+        log.scrollTop = log.scrollHeight;
+        while (log.children.length > 100) log.removeChild(log.firstChild);
     }
 
     function setStatus(ok, text) {
-        statusEl.className = 'status ' + (ok ? 'connected' : 'disconnected');
-        statusEl.textContent = text;
+        status.className = 'status ' + (ok ? 'connected' : 'disconnected');
+        status.textContent = text;
     }
 
-    function sendAction(key, ms) {
-        fetch(BASE + '/action', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: key, duration_ms: ms || 200 })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(d) { logMsg('POST /action ' + key + ' → ok', 'ok'); })
-        .catch(function(e) { logMsg('POST /action ' + key + ' ERROR: ' + e, 'err'); });
-    }
-
-    document.querySelectorAll('[data-key]').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            sendAction(btn.dataset.key, parseInt(btn.dataset.ms) || 200);
+    // Click controls → POST /action
+    document.querySelectorAll('[data-key]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const key = btn.dataset.key;
+            const ms = parseInt(btn.dataset.ms) || 200;
+            fetch(BASE + '/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, duration_ms: ms })
+            })
+            .then(r => r.json())
+            .then(d => logMsg('POST /action → ' + JSON.stringify(d), 'ok'))
+            .catch(e => logMsg('POST /action ERROR: ' + e, 'err'));
         });
     });
 
+    // Poll /state + /screenshot_base64
+    // Double-buffer: we always display prevImage, fetch into nextImage
+    var prevImage = 'data:image/png;base64,';
+    var nextImage = null;
+    var imgEl = document.getElementById('gameScreen');
+    var pollLocked = false;
+
+    function setImage(b64) {
+        prevImage = 'data:image/png;base64,' + b64;
+        imgEl.src = prevImage;
+    }
+
     async function poll() {
+        if (pollLocked) return;
+        pollLocked = true;
         try {
-            var stateRes = await fetch(BASE + '/state');
-            var imgRes = await fetch(BASE + '/screenshot_base64');
+            var [stateRes, imgRes] = await Promise.all([
+                fetch(BASE + '/state'),
+                fetch(BASE + '/screenshot_base64')
+            ]);
             if (!stateRes.ok || !imgRes.ok) throw new Error('fetch failed');
 
             var state = await stateRes.json();
@@ -314,25 +338,28 @@ static const char DASHBOARD_HTML[] = R"html(
                 document.getElementById('screenOverlay').classList.add('hidden');
             }
             if (img.image) {
-                document.getElementById('gameScreen').src = 'data:image/png;base64,' + img.image;
+                nextImage = img.image;
+                setImage(nextImage);
             }
             document.getElementById('stMode').textContent = state.mode || '—';
             document.getElementById('stMap').textContent = state.map_name || '—';
-            document.getElementById('stParty').textContent =
-                state.party_size != null ? state.party_size + ' chars' : '—';
+            document.getElementById('stParty').textContent = state.party_size != null ? state.party_size + ' chars' : '—';
 
             setStatus(true, '● Connected');
         } catch (e) {
             setStatus(false, 'Server unreachable');
+        } finally {
+            pollLocked = false;
         }
     }
 
+    // Screenshot is captured 100ms after the last /action,
+    // so stagger polls to land after the capture window
     poll();
-    setInterval(poll, POLL_MS);
+    setInterval(poll, 2000);
 })();
 </script>
 </body>
-</html>
-)html";
+</html>)html";
 
-#endif // VALYRIA_DASHBOARD_HTML_H
+#endif

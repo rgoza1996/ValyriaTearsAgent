@@ -61,6 +61,8 @@
         .game-screen-frame {
             position: relative;
             display: inline-block;
+            width: 800px;
+            height: 600px;
         }
         .game-screen-frame::before,
         .game-screen-frame::after,
@@ -81,11 +83,8 @@
 
         #gameScreen {
             display: block;
-            margin: auto;
-            max-width: 100%;
-            max-height: 100%;
-            min-height: 300px;
-            background: #000;
+            width: 800px;
+            height: 600px;
             object-fit: contain;
         }
         .screen-overlay {
@@ -303,23 +302,37 @@
     });
 
     // Poll /state + /screenshot_base64
+    // Double-buffer: we always display prevImage, fetch into nextImage
+    var prevImage = 'data:image/png;base64,';
+    var nextImage = null;
+    var imgEl = document.getElementById('gameScreen');
+    var pollLocked = false;
+
+    function setImage(b64) {
+        prevImage = 'data:image/png;base64,' + b64;
+        imgEl.src = prevImage;
+    }
+
     async function poll() {
+        if (pollLocked) return;
+        pollLocked = true;
         try {
-            const [stateRes, imgRes] = await Promise.all([
+            var [stateRes, imgRes] = await Promise.all([
                 fetch(BASE + '/state'),
                 fetch(BASE + '/screenshot_base64')
             ]);
             if (!stateRes.ok || !imgRes.ok) throw new Error('fetch failed');
 
-            const state = await stateRes.json();
-            const img = await imgRes.json();
+            var state = await stateRes.json();
+            var img = await imgRes.json();
 
             if (!hasFrame && img.image) {
                 hasFrame = true;
                 document.getElementById('screenOverlay').classList.add('hidden');
             }
             if (img.image) {
-                document.getElementById('gameScreen').src = 'data:image/png;base64,' + img.image;
+                nextImage = img.image;
+                setImage(nextImage);
             }
             document.getElementById('stMode').textContent = state.mode || '—';
             document.getElementById('stMap').textContent = state.map_name || '—';
@@ -328,11 +341,15 @@
             setStatus(true, '● Connected');
         } catch (e) {
             setStatus(false, 'Server unreachable');
+        } finally {
+            pollLocked = false;
         }
     }
 
+    // Screenshot is captured 100ms after the last /action,
+    // so stagger polls to land after the capture window
     poll();
-    setInterval(poll, POLL_MS);
+    setInterval(poll, 2000);
 })();
 </script>
 </body>
