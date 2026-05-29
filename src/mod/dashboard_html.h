@@ -83,9 +83,12 @@ static const char DASHBOARD_HTML[] = R"html(
         .corner-br::after  { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
         #gameScreen {
             display: block;
+            margin: auto;
             max-width: 100%;
+            max-height: 100%;
             min-height: 300px;
             background: #000;
+            object-fit: contain;
         }
         .screen-overlay {
             position: absolute;

@@ -42,7 +42,8 @@ Requires: C++17, SDL2, OpenGL, pthread
 
 ```bash
 # Headless (Xvfb)
-Xvfb :99 -screen 0 1024x768x24 &
+# Match Xvfb resolution to game's config (800x600 by default)
+Xvfb :99 -screen 0 800x600x24 &
 export DISPLAY=:99
 ./bin/etb
 ```
