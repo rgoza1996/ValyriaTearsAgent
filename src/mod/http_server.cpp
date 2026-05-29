@@ -68,7 +68,7 @@ std::string base64_encode(const std::string& input) {
     return out;
 }
 
-void send_response(struct mg_connection* conn, int status, const std::string& content_type, const std::string& body) {
+void send_response(::mg_connection* conn, int status, const std::string& content_type, const std::string& body) {
     std::string status_str = (status == 200) ? "200 OK" : (status == 400 ? "400 Bad Request" : "404 Not Found");
     mg_printf(conn, "HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n\r\n",
         status_str.c_str(), content_type.c_str(), body.size());
@@ -116,14 +116,14 @@ void HTTPServer::Stop() {
 }
 
 // static
-int HTTPServer::_HandleRequest(struct mg_connection* conn, void* /*cbdata*/) {
-    const mg_request_info* info = mg_get_request_info(conn);
+int HTTPServer::_HandleRequest(::mg_connection* conn, void* /*cbdata*/) {
+    const ::mg_request_info* info = mg_get_request_info(conn);
     if (!info || !info->request_method) {
         send_response(conn, 400, "text/plain", "Bad request");
         return 1;
     }
 
-    std::string uri = info->uri ? info->uri : "";
+    std::string uri = info->request_uri ? info->request_uri : "";
     std::string method = info->request_method;
 
     // GET /health
