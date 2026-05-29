@@ -1,0 +1,19 @@
+# Build artifacts
+bin/
+*.o
+*.a
+*.so
+*.out
+
+# Dev journal (personal notes)
+DEVELOPMENT.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
