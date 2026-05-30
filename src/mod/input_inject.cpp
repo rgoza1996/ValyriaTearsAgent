@@ -3,8 +3,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "input_inject.h"
-#include "engine/input.h"
 #include <SDL2/SDL_timer.h>
+#include "engine/input.h"
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_events.h>
 #include <algorithm>
@@ -18,6 +18,10 @@ std::string ToLower(const std::string& s) {
     std::transform(r.begin(), r.end(), r.begin(), ::tolower);
     return r;
 }
+
+} // anonymous namespace
+
+namespace {
 
 // Named action sequences (predefined multi-step actions)
 struct SequenceStep {
@@ -72,6 +76,7 @@ InputInjector::~InputInjector() {
     if (_mutex) SDL_DestroyMutex(_mutex);
 }
 
+// Static singleton accessor
 InputInjector* InputInjector::SingletonGet() {
     static InputInjector inst;
     return &inst;
@@ -83,14 +88,13 @@ SDL_Keycode InputInjector::_KeyNameToSDL(const std::string& key) {
     if (k == "down")   return SDLK_DOWN;
     if (k == "left")   return SDLK_LEFT;
     if (k == "right")  return SDLK_RIGHT;
-    if (k == "confirm") return SDLK_RETURN;
+    if (k == "confirm") return SDLK_RETURN;     // Enter
     if (k == "cancel") return SDLK_ESCAPE;
     if (k == "menu")   return SDLK_ESCAPE;
     if (k == "pause")  return SDLK_p;
     if (k == "minimap") return SDLK_TAB;
     if (k == "escape" || k == "esc") return SDLK_ESCAPE;
     if (k == "return" || k == "enter") return SDLK_RETURN;
-    if (k == "tab") return SDLK_TAB;
     return SDLK_UNKNOWN;
 }
 
@@ -101,6 +105,7 @@ void InputInjector::_InjectKeyDown(SDL_Keycode key) {
     ev.key.repeat = 0;
     ev.key.keysym.scancode = SDL_SCANCODE_UNKNOWN;
     ev.key.keysym.sym = key;
+    { FILE* _dbg = fopen("/tmp/inject_debug.log", "a"); if(_dbg) { fprintf(_dbg, "INJECT_KEY_DOWN: sym=%d\n", key); fclose(_dbg); } }
     ev.key.keysym.mod = KMOD_NONE;
     SDL_PushEvent(&ev);
 }
@@ -112,8 +117,19 @@ void InputInjector::_InjectKeyUp(SDL_Keycode key) {
     ev.key.repeat = 0;
     ev.key.keysym.scancode = SDL_SCANCODE_UNKNOWN;
     ev.key.keysym.sym = key;
+    { FILE* _dbg = fopen("/tmp/inject_debug.log", "a"); if(_dbg) { fprintf(_dbg, "INJECT_KEY_DOWN: sym=%d\n", key); fclose(_dbg); } }
     ev.key.keysym.mod = KMOD_NONE;
     SDL_PushEvent(&ev);
+}
+
+void InputInjector::QueueAction(const std::string& key, int duration_ms) {
+    { FILE* _dbg = fopen("/tmp/inject_debug.log", "a"); if(_dbg) { fprintf(_dbg, "QueueAction: key=%s duration=%d\n", key.c_str(), duration_ms); fclose(_dbg); } }
+    SDL_LockMutex(_mutex);
+    { FILE* _dbg = fopen("/tmp/inject_debug.log", "a"); if(_dbg) { fprintf(_dbg, "QueueAction: LOCKED _actions.size()=%zu\n", _actions.size()); fclose(_dbg); } }
+    _QueueActionUnlocked(key, duration_ms);
+    { FILE* _dbg = fopen("/tmp/inject_debug.log", "a"); if(_dbg) { fprintf(_dbg, "QueueAction: AFTER _actions.size()=%zu\n", _actions.size()); fclose(_dbg); } }
+    _current_sequence.clear();
+    SDL_UnlockMutex(_mutex);
 }
 
 void InputInjector::_QueueActionUnlocked(const std::string& key, int duration_ms) {
@@ -125,11 +141,35 @@ void InputInjector::_QueueActionUnlocked(const std::string& key, int duration_ms
     _actions.push_back(action);
 }
 
-void InputInjector::QueueAction(const std::string& key, int duration_ms) {
-    SDL_LockMutex(_mutex);
-    _QueueActionUnlocked(key, duration_ms);
-    _current_sequence.clear();  // interrupt any running sequence
-    SDL_UnlockMutex(_mutex);
+void InputInjector::Update() {
+    { FILE* _dbg = fopen("/tmp/inject_debug.log", "a"); if(_dbg) { fprintf(_dbg, "Update: %zu actions\n", _actions.size()); fclose(_dbg); } }
+    if (_actions.empty()) return;
+
+    Uint32 now = SDL_GetTicks();
+    std::vector<KeyAction> remaining;
+
+    for (auto& action : _actions) {
+        SDL_Keycode keycode = _KeyNameToSDL(action.key);
+        if (keycode == SDLK_UNKNOWN) continue;
+
+        if (!action.pressed) {
+            // Key not yet pressed — press it now
+            _InjectKeyDown(keycode);
+            action.pressed = true;
+            action.press_time = now;
+            remaining.push_back(action);  // keep tracking for release
+        } else {
+            // Key is pressed — check if duration elapsed
+            if (static_cast<int>(now - action.press_time) >= action.duration_ms) {
+                _InjectKeyUp(keycode);
+                // don't keep — action complete
+            } else {
+                bool already_in_remaining = false; for (const auto& a : remaining) { if (a.key == action.key && a.pressed) { already_in_remaining = true; break; } } if (!already_in_remaining) remaining.push_back(action);
+            }
+        }
+    }
+
+    _actions.swap(remaining);
 }
 
 void InputInjector::QueueSequence(const std::string& name) {
@@ -142,11 +182,10 @@ void InputInjector::QueueSequence(const std::string& name) {
     for (const auto& step : steps) {
         _QueueActionUnlocked(step.key, step.duration_ms);
         if (step.wait_ms > 0) {
-            // Insert a no-op wait action to consume time
             KeyAction wait;
             wait.key = "__wait__";
             wait.duration_ms = step.wait_ms;
-            wait.pressed = true;  // already "done" — will be skipped in Update
+            wait.pressed = true;
             wait.press_time = 0;
             _actions.push_back(wait);
         }
@@ -162,67 +201,8 @@ std::string InputInjector::GetCurrentSequence() const {
     return seq;
 }
 
-void InputInjector::Update() {
-    SDL_LockMutex(_mutex);
-    if (_actions.empty()) {
-        SDL_UnlockMutex(_mutex);
-        return;
-    }
-
-    Uint32 now = SDL_GetTicks();
-    std::vector<KeyAction> remaining;
-
-    for (auto& action : _actions) {
-        // Wait actions — just consume time then drop
-        if (action.key == "__wait__") {
-            if (!action.pressed) {
-                action.pressed = true;
-                action.press_time = now;
-                remaining.push_back(action);
-            } else if (static_cast<int>(now - action.press_time) >= action.duration_ms) {
-                // wait complete — drop it, clear sequence if this was the last real action
-            } else {
-                remaining.push_back(action);
-            }
-            continue;
-        }
-
-        SDL_Keycode keycode = _KeyNameToSDL(action.key);
-        if (keycode == SDLK_UNKNOWN) continue;
-
-        if (!action.pressed) {
-            _InjectKeyDown(keycode);
-            action.pressed = true;
-            action.press_time = now;
-            remaining.push_back(action);
-        } else {
-            if (static_cast<int>(now - action.press_time) >= action.duration_ms) {
-                _InjectKeyUp(keycode);
-            } else {
-                remaining.push_back(action);
-            }
-        }
-    }
-
-    _actions.swap(remaining);
-    if (_actions.empty()) {
-        _current_sequence.clear();
-    }
-    SDL_UnlockMutex(_mutex);
-}
-
 void InputInjector::Clear() {
-    SDL_LockMutex(_mutex);
     _actions.clear();
-    _current_sequence.clear();
-    SDL_UnlockMutex(_mutex);
-}
-
-bool InputInjector::IsActive() const {
-    SDL_LockMutex(_mutex);
-    bool active = !_actions.empty();
-    SDL_UnlockMutex(_mutex);
-    return active;
 }
 
 } // namespace vt_mod

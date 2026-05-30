@@ -1,14 +1,11 @@
-////////////////////////////////////////////////////////////////////////////////
-// ValyriaTear HTTP API Mod — HTTP Server (civetweb)
-////////////////////////////////////////////////////////////////////////////////
+// ValyriaTear HTTP API Mod — HTTP Server Header (POSIX sockets)
 
 #ifndef VALYRIA_HTTP_SERVER_H
 #define VALYRIA_HTTP_SERVER_H
 
 #include <string>
-
-struct mg_context;
-struct mg_connection;
+#include <thread>
+#include <atomic>
 
 namespace vt_mod {
 
@@ -18,17 +15,19 @@ public:
 
     bool Start(int port = 8080);
     void Stop();
-    bool IsRunning() const { return _ctx != nullptr; }
-    int GetPort() const { return _port; }
+    bool IsRunning() const;
 
 private:
     HTTPServer();
     ~HTTPServer();
 
-    static int _HandleRequest(::mg_connection* conn, void* cbdata);
-
-    struct mg_context* _ctx;
+    int server_fd_;
+    std::thread accept_thread_;
+    std::atomic<bool> running_;
     int _port;
+
+    void accept_loop();
+    void handle_client(int client_fd);
 };
 
 } // namespace vt_mod

@@ -133,8 +133,12 @@ std::string GameAPI::GetStateJSON() {
 
                 vt_map::private_map::VirtualSprite* cam = mm->GetCamera();
                 if (cam) {
-                    WriteFloat(json, "player_x", cam->GetXPosition());
-                    WriteFloat(json, "player_y", cam->GetYPosition());
+                    float px = cam->GetXPosition();
+                    float py = cam->GetYPosition();
+                    FILE* dbg = fopen("/tmp/cam_debug.txt", "a");
+                    if (dbg) { fprintf(dbg, "camera pos: %f, %f\n", px, py); fclose(dbg); }
+                    WriteFloat(json, "player_x", px);
+                    WriteFloat(json, "player_y", py);
                 }
             }
         } catch (const std::exception& e) {
