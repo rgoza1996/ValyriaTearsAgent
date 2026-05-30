@@ -73,7 +73,30 @@ void WriteFloat(std::ostringstream& json, const std::string& key, float value, b
     if (!last) json << ",";
 }
 
+
+// UTF-16 LE to UTF-8
+std::string Utf16ToUtf8(const uint16_t* utf16, size_t len) {
+    std::string result;
+    result.reserve(len * 3 / 2);
+    for (size_t i = 0; i < len; ++i) {
+        uint16_t c = utf16[i];
+        if (c == 0) break;
+        if (c < 0x80) {
+            result.push_back(static_cast<char>(c));
+        } else if (c < 0x800) {
+            result.push_back(static_cast<char>(0xC0 | (c >> 6)));
+            result.push_back(static_cast<char>(0x80 | (c & 0x3F)));
+        } else {
+            result.push_back(static_cast<char>(0xE0 | (c >> 12)));
+            result.push_back(static_cast<char>(0x80 | ((c >> 6) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | (c & 0x3F)));
+        }
+    }
+    return result;
+}
+
 } // anonymous namespace
+
 
 // ---------------------------------------------------------------------------
 // State — enriched structured state
@@ -110,8 +133,12 @@ std::string GameAPI::GetStateJSON() {
 
                 vt_map::private_map::VirtualSprite* cam = mm->GetCamera();
                 if (cam) {
-                    WriteFloat(json, "player_x", cam->GetXPosition());
-                    WriteFloat(json, "player_y", cam->GetYPosition());
+                    float px = cam->GetXPosition();
+                    float py = cam->GetYPosition();
+                    FILE* dbg = fopen("/tmp/cam_debug.txt", "a");
+                    if (dbg) { fprintf(dbg, "camera pos: %f, %f\n", px, py); fclose(dbg); }
+                    WriteFloat(json, "player_x", px);
+                    WriteFloat(json, "player_y", py);
                 }
             }
         } catch (const std::exception& e) {
@@ -151,7 +178,17 @@ std::string GameAPI::GetStateJSON() {
             first_quest = false;
             json << "{";
             WriteRaw(json, "quest_id", "\"" + entry->GetQuestId() + "\"");
-            WriteInt(json, "log_number", entry->GetQuestLogNumber(), true);
+            WriteInt(json, "log_number", entry->GetQuestLogNumber());
+            bool is_last_quest = first_quest;
+            try {
+                const QuestLogInfo& info = quests.GetQuestInfo(entry->GetQuestId());
+                const vt_utils::ustring& title = info.GetTitle();
+                const vt_utils::ustring& desc = info.GetDescription();
+                WriteStr(json, "title", Utf16ToUtf8(title.c_str(), title.size()));
+                WriteStr(json, "description", Utf16ToUtf8(desc.c_str(), desc.size()), is_last_quest);
+            } catch (const std::exception&) {
+                WriteStr(json, "title", "", is_last_quest);
+            }
             json << "}";
         }
         json << "]";
@@ -159,10 +196,10 @@ std::string GameAPI::GetStateJSON() {
         // Inventory
         InventoryHandler& inv = GlobalManager->GetInventoryHandler();
         auto& items = inv.GetInventoryItems();
-        WriteInt(json, "inventory_count", static_cast<int>(items.size()));
+        json << ",\"inventory_count\":" << static_cast<int>(items.size());
 
         // Gold
-        WriteInt(json, "gold", GlobalManager->GetDrunes(), true);
+        json << ",\"gold\":" << GlobalManager->GetDrunes();
 
     } catch (const std::exception& e) {
         WriteInt(json, "party_size", 0, true);

@@ -178,13 +178,22 @@ void handle_request(int client_fd, const std::string& method, const std::string&
         send_response(client_fd, 200, "application/json", resp.data(), resp.size());
         return;
     }
+    // /screenshot and /screenshot.png — use xwd to capture from Xvfb (avoids OpenGL crash in headless)
     if (method == "GET" && (uri == "/screenshot" || uri == "/screenshot.png")) {
-        std::string path = GameAPI::SingletonGet()->TakeScreenshot();
-        if (file_exists_and_readable(path)) {
-            send_file_response(client_fd, path, "image/png");
+        // Run xwd to capture to PNG via python script, then serve the file
+        pid_t pid = fork();
+        if (pid == 0) {
+            setenv("DISPLAY", ":99", 1);
+            execlp("python3", "python3", "/tmp/screenshot_server.py", (char*)nullptr);
+            exit(1);
+        }
+        int status;
+        waitpid(pid, &status, 0);
+        const char* screenshot_file = "/tmp/screenshot.png";
+        if (file_exists_and_readable(screenshot_file)) {
+            send_file_response(client_fd, screenshot_file, "image/png");
         } else {
-            const char tiny_png[] = "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82";
-            send_response(client_fd, 200, "image/png", tiny_png, 61);
+            send_response(client_fd, 500, "text/plain", "Screenshot capture failed", 24);
         }
         return;
     }
